@@ -1,0 +1,374 @@
+{% extends "agenda/base.html" %}
+
+{% block title %}Agenda semanal{% endblock %}
+
+{% block content %}
+<div class="grid">
+    <div class="card">
+        <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between;">
+            <div>
+                <h1 style="margin:0; font-size:28px;">Agenda semanal</h1>
+                <div class="muted">{{ week_start|date:"d/m" }} - {{ week_end|date:"d/m" }}</div>
+                {% if booking_status == "success" %}
+                <div class="notice">Agendamento criado com sucesso.</div>
+                {% endif %}
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <form method="get" class="filter-form">
+                    <input type="hidden" name="date" value="{{ week_start|date:"Y-m-d" }}" />
+                    <label>
+                        <span class="muted">Profissional</span>
+                        <select name="collaborator">
+                            <option value="">Todos</option>
+                            {% for collaborator in all_collaborators %}
+                            <option value="{{ collaborator.id }}"
+                                {% if collaborator.id|stringformat:"s" == selected_collaborator_id %}selected{% endif %}>
+                                {{ collaborator.get_full_name|default:collaborator.username }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <button class="btn" type="submit">Filtrar</button>
+                </form>
+                <a class="btn"
+                    href="?date={{ prev_week|date:"Y-m-d" }}{% if selected_collaborator_id %}&collaborator={{ selected_collaborator_id }}{% endif %}">Semana
+                    anterior</a>
+                <a class="btn primary"
+                    href="?date={{ next_week|date:"Y-m-d" }}{% if selected_collaborator_id %}&collaborator={{ selected_collaborator_id }}{% endif %}">Proxima
+                    semana</a>
+                <button class="btn primary" type="button" data-open-modal>Novo agendamento</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="overflow:auto;">
+        <div class="week-grid">
+            <div class="grid-head"></div>
+            {% for day in days %}
+            <a class="grid-head" href="{% url 'agenda-day' day.year day.month day.day %}">
+                <div>{{ day|date:"D" }}</div>
+                <div class="muted" style="font-size:13px;">{{ day|date:"d/m" }}</div>
+            </a>
+            {% endfor %}
+
+            {% for row in rows %}
+            <div class="grid-collab">
+                {{ row.collaborator.get_full_name|default:row.collaborator.username }}
+            </div>
+            {% for cell in row.days %}
+            <div class="grid-cell">
+                {% if cell.appointments %}
+                <ul class="slot-list">
+                    {% for appointment in cell.appointments %}
+                    <li>
+                        <strong>{{ appointment.start_time|date:"H:i" }}</strong>
+                        <span>{{ appointment.client_display }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <span class="muted">--</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="staff-booking-modal" data-slots-url="{% url 'agenda-slots' %}"
+    data-open="{{ open_booking_modal|yesno:'1,0' }}">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-card">
+        <div class="modal-header">
+            <h2 style="margin:0;">Novo agendamento</h2>
+            <button class="btn" type="button" data-close-modal>Fechar</button>
+        </div>
+        <form method="post" class="grid" id="staff-booking-form">
+            {% csrf_token %}
+            {{ staff_form.non_field_errors }}
+            <div class="form-row">
+                <label>
+                    <div class="muted">Nome do cliente</div>
+                    {{ staff_form.client_name.errors }}
+                    {{ staff_form.client_name }}
+                </label>
+                <label>
+                    <div class="muted">Telefone</div>
+                    {{ staff_form.client_phone.errors }}
+                    {{ staff_form.client_phone }}
+                </label>
+            </div>
+            <div class="form-row">
+                <label>
+                    <div class="muted">Data</div>
+                    {{ staff_form.date.errors }}
+                    {{ staff_form.date }}
+                </label>
+                <label>
+                    <div class="muted">Profissional</div>
+                    {{ staff_form.collaborator.errors }}
+                    {{ staff_form.collaborator }}
+                </label>
+            </div>
+            <div class="form-row">
+                <label>
+                    <div class="muted">Horario</div>
+                    {{ staff_form.time.errors }}
+                    {{ staff_form.time }}
+                </label>
+                <label>
+                    <div class="muted">Observacoes (opcional)</div>
+                    {{ staff_form.notes.errors }}
+                    {{ staff_form.notes }}
+                </label>
+            </div>
+            <button class="btn primary" type="submit">Confirmar agendamento</button>
+        </form>
+    </div>
+</div>
+
+<style>
+    .week-grid {
+        display: grid;
+        grid-template-columns: 180px repeat(7, minmax(140px, 1fr));
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        overflow: hidden;
+    }
+
+    .grid-head {
+        background: var(--bg-alt);
+        padding: 14px 12px;
+        font-weight: 600;
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+    }
+
+    .grid-collab {
+        padding: 12px;
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        font-weight: 600;
+        background: #fffdf8;
+    }
+
+    .grid-cell {
+        padding: 10px 12px;
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        min-height: 72px;
+    }
+
+    .slot-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 6px;
+    }
+
+    .slot-list li {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: #fff6ec;
+        border: 1px solid #f0dfcd;
+        font-size: 13px;
+    }
+
+    @media (max-width: 900px) {
+        .week-grid {
+            grid-template-columns: 150px repeat(7, minmax(120px, 1fr));
+        }
+    }
+
+    .notice {
+        margin-top: 8px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: #fff6ec;
+        border: 1px solid #f0dfcd;
+        font-weight: 600;
+        display: inline-flex;
+    }
+
+    .modal {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+    }
+
+    .modal.open {
+        display: flex;
+    }
+
+    .modal-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(30, 28, 26, 0.4);
+        backdrop-filter: blur(2px);
+    }
+
+    .modal-card {
+        position: relative;
+        max-width: 720px;
+        width: min(92vw, 720px);
+        background: var(--card);
+        border-radius: 18px;
+        border: 1px solid var(--line);
+        padding: 20px;
+        box-shadow: 0 24px 50px rgba(30, 28, 26, 0.2);
+        z-index: 1;
+    }
+
+    .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    #staff-booking-form label {
+        display: grid;
+        gap: 6px;
+    }
+
+    #staff-booking-form input,
+    #staff-booking-form select,
+    #staff-booking-form textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        font-size: 15px;
+    }
+
+    #staff-booking-form textarea {
+        resize: vertical;
+        min-height: 80px;
+    }
+
+    .form-row {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .errorlist {
+        margin: 6px 0 0;
+        padding-left: 18px;
+        color: #b03a2e;
+        font-size: 14px;
+    }
+
+    .filter-form {
+        display: flex;
+        align-items: flex-end;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .filter-form label {
+        display: grid;
+        gap: 6px;
+    }
+
+    .filter-form select {
+        min-width: 220px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        font-size: 14px;
+        background: var(--card);
+    }
+</style>
+
+<script>
+    (() => {
+        const modal = document.getElementById("staff-booking-modal");
+        if (!modal) {
+            return;
+        }
+
+        const openButtons = document.querySelectorAll("[data-open-modal]");
+        const closeButtons = modal.querySelectorAll("[data-close-modal]");
+        const dateInput = modal.querySelector("#id_date");
+        const collaboratorInput = modal.querySelector("#id_collaborator");
+        const timeSelect = modal.querySelector("#id_time");
+        const slotsUrl = modal.dataset.slotsUrl;
+
+        const openModal = () => {
+            modal.classList.add("open");
+        };
+
+        const closeModal = () => {
+            modal.classList.remove("open");
+        };
+
+        const setTimeOptions = (slots) => {
+            if (!timeSelect) {
+                return;
+            }
+            const selectedValue = timeSelect.value;
+            timeSelect.innerHTML = "";
+            const placeholder = document.createElement("option");
+            placeholder.value = "";
+            placeholder.textContent = slots.length ? "Selecione" : "Sem horarios";
+            timeSelect.appendChild(placeholder);
+            slots.forEach((slot) => {
+                const option = document.createElement("option");
+                option.value = slot;
+                option.textContent = slot;
+                timeSelect.appendChild(option);
+            });
+            if (selectedValue) {
+                timeSelect.value = selectedValue;
+            }
+        };
+
+        const loadSlots = async () => {
+            if (!dateInput || !collaboratorInput || !slotsUrl) {
+                return;
+            }
+            if (!dateInput.value || !collaboratorInput.value) {
+                setTimeOptions([]);
+                return;
+            }
+            const params = new URLSearchParams({
+                date: dateInput.value,
+                collaborator: collaboratorInput.value,
+            });
+            try {
+                const response = await fetch(`${slotsUrl}?${params.toString()}`);
+                if (!response.ok) {
+                    setTimeOptions([]);
+                    return;
+                }
+                const data = await response.json();
+                setTimeOptions(data.slots || []);
+            } catch (err) {
+                setTimeOptions([]);
+            }
+        };
+
+        openButtons.forEach((btn) => btn.addEventListener("click", openModal));
+        closeButtons.forEach((btn) => btn.addEventListener("click", closeModal));
+        modal.querySelector(".modal-backdrop")?.addEventListener("click", closeModal);
+        dateInput?.addEventListener("change", loadSlots);
+        collaboratorInput?.addEventListener("change", loadSlots);
+
+        if (modal.dataset.open === "1") {
+            openModal();
+        }
+        loadSlots();
+    })();
+</script>
+{% endblock %}

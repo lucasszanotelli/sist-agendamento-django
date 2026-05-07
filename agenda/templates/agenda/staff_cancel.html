@@ -1,0 +1,244 @@
+{% extends "agenda/base.html" %}
+
+{% block title %}Cancelamentos{% endblock %}
+
+{% block content %}
+<div class="grid">
+    <div class="card">
+        <h1 style="margin:0 0 8px; font-size:28px;">Cancelamentos</h1>
+        {% if status_message %}
+        <div class="notice">{{ status_message }}</div>
+        {% endif %}
+        <form method="get" class="filter-form">
+            <div class="form-row">
+                <label>
+                    <div class="muted">Data</div>
+                    {{ filter_form.date.errors }}
+                    {{ filter_form.date }}
+                </label>
+                <label>
+                    <div class="muted">Colaborador</div>
+                    {{ filter_form.collaborator.errors }}
+                    {{ filter_form.collaborator }}
+                </label>
+            </div>
+            <button class="btn primary" type="submit">Filtrar</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">Agendamentos ativos</h2>
+        {% if appointments %}
+        <div class="list">
+            {% for appointment in appointments %}
+            <div class="item">
+                <div>
+                    <strong>{{ appointment.start_time|date:"d/m/Y H:i" }}</strong>
+                    <div class="muted">{{ appointment.client_display }}</div>
+                    {% if appointment.client_phone %}
+                    <div class="muted">{{ appointment.client_phone }}</div>
+                    {% endif %}
+                    <div class="muted">
+                        {{ appointment.collaborator.get_full_name|default:appointment.collaborator.username }}</div>
+                    {% if appointment.notes %}
+                    <div class="muted">{{ appointment.notes }}</div>
+                    {% endif %}
+                </div>
+                <div class="item-actions">
+                    <form method="post" action="{% url 'staff-cancel-action' appointment.id %}" class="cancel-form"
+                        data-message="Cancelar o agendamento de {{ appointment.client_display }} em {{ appointment.start_time|date:"d/m/Y H:i" }}?">
+                        {% csrf_token %}
+                        <button class="btn" type="submit">Cancelar</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">Nenhum agendamento encontrado.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal" id="cancel-modal">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-card">
+        <div class="modal-header">
+            <h2 style="margin:0;">Confirmar cancelamento</h2>
+            <button class="btn" type="button" data-close-modal>Fechar</button>
+        </div>
+        <p id="cancel-modal-message" class="muted">Deseja cancelar este agendamento?</p>
+        <div class="modal-actions">
+            <button class="btn" type="button" data-close-modal>Voltar</button>
+            <button class="btn primary" type="button" data-confirm-cancel>Confirmar</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .notice {
+        margin-top: 8px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: #fff6ec;
+        border: 1px solid #f0dfcd;
+        font-weight: 600;
+    }
+
+    .list {
+        display: grid;
+        gap: 12px;
+    }
+
+    .item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: #fffdf8;
+    }
+
+    .item-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .filter-form {
+        display: grid;
+        gap: 12px;
+    }
+
+    form label {
+        display: grid;
+        gap: 6px;
+    }
+
+    input,
+    select {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        font-size: 15px;
+    }
+
+    .form-row {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .errorlist {
+        margin: 6px 0 0;
+        padding-left: 18px;
+        color: #b03a2e;
+        font-size: 14px;
+    }
+
+    .modal {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+    }
+
+    .modal.open {
+        display: flex;
+    }
+
+    .modal-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(30, 28, 26, 0.4);
+        backdrop-filter: blur(2px);
+    }
+
+    .modal-card {
+        position: relative;
+        max-width: 520px;
+        width: min(92vw, 520px);
+        background: var(--card);
+        border-radius: 18px;
+        border: 1px solid var(--line);
+        padding: 20px;
+        box-shadow: 0 24px 50px rgba(30, 28, 26, 0.2);
+        z-index: 1;
+    }
+
+    .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 16px;
+    }
+
+    @media (max-width: 720px) {
+        .item {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+</style>
+
+<script>
+    (() => {
+        const modal = document.getElementById("cancel-modal");
+        const messageEl = document.getElementById("cancel-modal-message");
+        const confirmButton = modal?.querySelector("[data-confirm-cancel]");
+        const closeButtons = modal?.querySelectorAll("[data-close-modal]") || [];
+        const backdrop = modal?.querySelector(".modal-backdrop");
+
+        let pendingForm = null;
+
+        const openModal = (message) => {
+            if (!modal) {
+                return;
+            }
+            if (messageEl) {
+                messageEl.textContent = message || "Deseja cancelar este agendamento?";
+            }
+            modal.classList.add("open");
+        };
+
+        const closeModal = () => {
+            if (!modal) {
+                return;
+            }
+            modal.classList.remove("open");
+            pendingForm = null;
+        };
+
+        document.querySelectorAll(".cancel-form").forEach((form) => {
+            form.addEventListener("submit", (event) => {
+                event.preventDefault();
+                pendingForm = form;
+                openModal(form.dataset.message);
+            });
+        });
+
+        confirmButton?.addEventListener("click", () => {
+            if (pendingForm) {
+                pendingForm.submit();
+            }
+        });
+
+        closeButtons.forEach((button) => button.addEventListener("click", closeModal));
+        backdrop?.addEventListener("click", closeModal);
+    })();
+</script>
+{% endblock %}

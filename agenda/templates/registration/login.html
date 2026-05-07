@@ -1,0 +1,40 @@
+{% extends "agenda/base.html" %}
+
+{% block title %}Entrar{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width:420px; margin:0 auto;">
+    <h1 style="margin-top:0;">Entrar</h1>
+    <form method="post" class="grid">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="grid">
+            <label>
+                <div class="muted">Usuario</div>
+                {{ form.username }}
+            </label>
+            <label>
+                <div class="muted">Senha</div>
+                {{ form.password }}
+            </label>
+        </div>
+        <button class="btn primary" type="submit">Entrar</button>
+    </form>
+</div>
+
+<style>
+    input {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        font-size: 15px;
+        margin-top: 6px;
+    }
+
+    label {
+        display: grid;
+        gap: 6px;
+    }
+</style>
+{% endblock %}
