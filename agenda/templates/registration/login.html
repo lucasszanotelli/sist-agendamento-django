@@ -8,7 +8,7 @@
     <form method="post" class="grid">
         {% csrf_token %}
         {{ form.non_field_errors }}
-        <div class="grid">
+        <div class="grid">1
             <label>
                 <div class="muted">Usuario</div>
                 {{ form.username }}
@@ -20,6 +20,9 @@
         </div>
         <button class="btn primary" type="submit">Entrar</button>
     </form>
+    <div class="login-actions">
+        <a class="btn" href="{% url 'home' %}">Voltar para a home</a>
+    </div>
 </div>
 
 <style>
@@ -35,6 +38,12 @@
     label {
         display: grid;
         gap: 6px;
+    }
+
+    .login-actions {
+        margin-top: 16px;
+        display: flex;
+        justify-content: center;
     }
 </style>
 {% endblock %}

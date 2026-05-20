@@ -59,7 +59,10 @@
     <div class="modal-backdrop" data-close-modal></div>
     <div class="modal-card">
         <div class="modal-header">
-            <h2 style="margin:0;">Agendar horario</h2>
+            <div>
+                <h2 style="margin:0;">Agendar horario</h2>
+                <div class="muted" id="public-booking-selected-date"></div>
+            </div>
             <button class="btn" type="button" data-close-modal>Fechar</button>
         </div>
         <form method="post" class="grid" id="public-booking-form">
@@ -81,7 +84,8 @@
                 <label>
                     <div class="muted">Data</div>
                     {{ public_form.date.errors }}
-                    {{ public_form.date }}
+                    {{ public_form.date.as_hidden }}
+                    <input id="public-date-display" class="readonly-input" type="text" readonly />
                 </label>
                 <label>
                     <div class="muted">Profissional</div>
@@ -158,6 +162,10 @@
         box-shadow: inset 0 0 0 2px var(--accent);
     }
 
+    .day-card.active {
+        box-shadow: inset 0 0 0 2px var(--accent);
+    }
+
     .day-number {
         font-weight: 700;
         font-size: 20px;
@@ -196,6 +204,11 @@
     #public-booking-form textarea {
         resize: vertical;
         min-height: 80px;
+    }
+
+    #public-booking-form .readonly-input {
+        background: var(--bg-alt);
+        color: var(--ink);
     }
 
     .form-row {
@@ -260,17 +273,65 @@
 
 <script>
     (() => {
-        const container = document.getElementById("public-booking");
-        const form = document.getElementById("public-booking-form");
-        if (!container || !form) {
+        const modal = document.getElementById("public-booking-modal");
+        if (!modal) {
+            return;
+        }
+
+        const form = modal.querySelector("#public-booking-form");
+        if (!form) {
             return;
         }
 
         const dateInput = form.querySelector("#id_date");
+        const dateDisplay = form.querySelector("#public-date-display");
         const collaboratorInput = form.querySelector("#id_collaborator");
         const timeSelect = form.querySelector("#id_time");
-        const slotsUrl = container.dataset.slotsUrl;
+        const slotsUrl = modal.dataset.slotsUrl;
         const dayButtons = document.querySelectorAll("[data-day-select]");
+        const selectedDateLabel = modal.querySelector("#public-booking-selected-date");
+        const closeButtons = modal.querySelectorAll("[data-close-modal]");
+
+        const openModal = () => {
+            modal.classList.add("open");
+        };
+
+        const closeModal = () => {
+            modal.classList.remove("open");
+        };
+
+        const formatDateLabel = (value) => {
+            if (!value) {
+                return "";
+            }
+            let year = "";
+            let month = "";
+            let day = "";
+            if (value.includes("-")) {
+                [year, month, day] = value.split("-");
+            } else if (value.includes("/")) {
+                [day, month, year] = value.split("/");
+            } else {
+                return value;
+            }
+            if (!year || !month || !day) {
+                return value;
+            }
+            return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`;
+        };
+
+        const setSelectedDate = (value) => {
+            if (!selectedDateLabel) {
+                if (dateDisplay) {
+                    dateDisplay.value = formatDateLabel(value);
+                }
+                return;
+            }
+            selectedDateLabel.textContent = formatDateLabel(value);
+            if (dateDisplay) {
+                dateDisplay.value = formatDateLabel(value);
+            }
+        };
 
         const setTimeOptions = (slots) => {
             if (!timeSelect) {
@@ -333,18 +394,31 @@
                 if (!dateInput) {
                     return;
                 }
-                dateInput.value = button.dataset.date;
-                setActiveDay(button.dataset.date);
+                const dateValue = button.dataset.date || "";
+                dateInput.value = dateValue;
+                setSelectedDate(dateValue);
+                setActiveDay(dateValue);
+                openModal();
                 loadSlots();
                 collaboratorInput?.focus();
-                form.scrollIntoView({ behavior: "smooth", block: "start" });
             });
         });
 
-        dateInput?.addEventListener("change", loadSlots);
+        closeButtons.forEach((btn) => btn.addEventListener("click", closeModal));
+        modal.querySelector(".modal-backdrop")?.addEventListener("click", closeModal);
+
+        dateInput?.addEventListener("change", () => {
+            setSelectedDate(dateInput.value);
+            setActiveDay(dateInput.value);
+            loadSlots();
+        });
         collaboratorInput?.addEventListener("change", loadSlots);
         if (dateInput?.value) {
+            setSelectedDate(dateInput.value);
             setActiveDay(dateInput.value);
+        }
+        if (modal.dataset.open === "1") {
+            openModal();
         }
         loadSlots();
     })();
